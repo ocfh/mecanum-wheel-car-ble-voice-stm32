@@ -1,0 +1,71 @@
+<html>
+<body>
+<pre>
+<h1>µVision Build Log</h1>
+<h2>Tool Versions:</h2>
+IDE-Version: ¦ÌVision V5.40.0.0
+Copyright (C) 2024 ARM Ltd and ARM Germany GmbH. All rights reserved.
+License Information: Arm Arm, Arm, LIC=8VRJ7-EG8TV-MM99I-TA2WD-39TM9-DAGGL
+ 
+Tool Versions:
+Toolchain:       MDK-ARM Plus  Version: 5.40.0.3
+Toolchain Path:  D:\KeilV5\KeilArm\Software\ARM\ARMCC\Bin
+C Compiler:      Armcc.exe V5.06 update 5 (build 528)
+Assembler:       Armasm.exe V5.06 update 5 (build 528)
+Linker/Locator:  ArmLink.exe V5.06 update 5 (build 528)
+Library Manager: ArmAr.exe V5.06 update 5 (build 528)
+Hex Converter:   FromElf.exe V5.06 update 5 (build 528)
+CPU DLL:         SARMCM3.DLL V5.40.0.3
+Dialog DLL:      DCM.DLL V1.17.5.0
+Target DLL:      Segger\JL2CM3.dll V2.99.44.0
+Dialog DLL:      TCM.DLL V1.56.4.0
+ 
+<h2>Project:</h2>
+D:\MCU_Project\STM\STM\STM32project\STM32F407\Project5_EXIT_SR04_V.0.2\USER\pro.uvprojx
+Project File Date:  06/18/2026
+
+<h2>Output:</h2>
+*** Using Compiler 'V5.06 update 5 (build 528)', folder: 'D:\KeilV5\KeilArm\Software\ARM\ARMCC\Bin'
+Rebuild target 'project'
+assembling startup_stm32f40_41xxx.s...
+compiling stm32f4xx_exti.c...
+compiling stm32f4xx_usart.c...
+compiling USART1.c...
+compiling misc.c...
+compiling Motor.c...
+compiling USART3.c...
+compiling stm32f4xx_gpio.c...
+compiling DHT11.c...
+compiling SU03T.c...
+..\HARDWARE\SU03T.c(129): warning:  #111-D: statement is unreachable
+  			USART_ClearITPendingBit(UART4, USART_IT_RXNE);
+..\HARDWARE\SU03T.c: 1 warning, 0 errors
+compiling HC_SR04.c...
+compiling LED.c...
+compiling stm32f4xx_tim.c...
+compiling stm32f4xx_rcc.c...
+compiling stm32f4xx_syscfg.c...
+compiling stm32f4xx_it.c...
+compiling system_stm32f4xx.c...
+compiling delay.c...
+compiling main.c...
+linking...
+Program Size: Code=6140 RO-data=424 RW-data=76 ZI-data=1028  
+FromELF: creating hex file...
+"..\OBJ\pro.axf" - 0 Error(s), 1 Warning(s).
+
+<h2>Software Packages used:</h2>
+
+Package Vendor: Keil
+                http://www.keil.com/pack/Keil.STM32F4xx_DFP.1.0.8.pack
+                Keil::STM32F4xx_DFP@1.0.8
+                STMicroelectronics STM32F4 Series Device Support, Drivers and Examples
+
+<h2>Collection of Component include folders:</h2>
+  D:/KeilV5/KeilArm/Software/Keil/STM32F4xx_DFP/1.0.8/Device/Include
+
+<h2>Collection of Component Files used:</h2>
+Build Time Elapsed:  00:00:01
+</pre>
+</body>
+</html>
