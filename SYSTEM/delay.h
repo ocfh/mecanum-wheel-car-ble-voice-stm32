@@ -3,8 +3,8 @@
 
 #include "stm32f4xx.h"
 void SysTick_Init(void);
-void delay_ms(u32 nms);
-void delay_us(u32 nus);
+void delay_ms(uint32_t ms);
+void delay_us(uint32_t us);
 
 #endif
 
