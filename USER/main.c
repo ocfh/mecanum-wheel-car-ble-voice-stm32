@@ -1,372 +1,153 @@
 #include "stm32f4xx.h"
 #include "delay.h"
-#include  "BLE.h"
-#define MR1_PWM_PIN    GPIO_Pin_6
-#define MR1_PWM_PORT   GPIOA
-#define MR1_IN1_PIN    GPIO_Pin_4
-#define MR1_IN1_PORT   GPIOE
-#define MR1_IN2_PIN    GPIO_Pin_5
-#define MR1_IN2_PORT   GPIOE
+#include "DHT11.h"
+#include "LED.h"
+#include "Motor.h"
+#include "USART1.h"
+#include "USART3.h"
+#include "HC_SR04.h"
+#include "SU03T.h"
 
-#define MR2_PWM_PIN    GPIO_Pin_7
-#define MR2_PWM_PORT   GPIOA
-#define MR2_IN1_PIN    GPIO_Pin_3
-#define MR2_IN1_PORT   GPIOE
-#define MR2_IN2_PIN    GPIO_Pin_2
-#define MR2_IN2_PORT   GPIOE
 
-#define ML1_PWM_PIN    GPIO_Pin_0
-#define ML1_PWM_PORT   GPIOB
-#define ML1_IN1_PIN    GPIO_Pin_12
-#define ML1_IN1_PORT   GPIOD
-#define ML1_IN2_PIN    GPIO_Pin_13
-#define ML1_IN2_PORT   GPIOD
 
-#define ML2_PWM_PIN    GPIO_Pin_1
-#define ML2_PWM_PORT   GPIOB
-#define ML2_IN1_PIN    GPIO_Pin_14
-#define ML2_IN1_PORT   GPIOD
-#define ML2_IN2_PIN    GPIO_Pin_15
-#define ML2_IN2_PORT   GPIOD
+//----------------串口1变量------------------
+//extern uint8_t usart_rx_buf[USART_RX_BUF_LEN];
+//extern uint8_t usart_rx_cnt;
+//------------------ End --------------------
 
-#define MOTOR_EN_PIN   GPIO_Pin_4
-#define MOTOR_EN_PORT  GPIOC
+//-----------------超声波相关变量--------------------
+extern volatile uint8_t auto_avoid_flag;
+////自动避障总开关
+//volatile uint8_t auto_avoid_flag = 0;
+//// 避障动作状态：0=空闲  1=正在执行避障动作
+//volatile uint8_t avoid_action_flag = 0;
+//--------------------- End -------------------------
 
-#define LED_PWR_PIN    GPIO_Pin_13
-#define LED_PWR_PORT   GPIOB
+// --------------- 函数声明 ---------------
 
-void Motor_GPIO_Init(void);
-void Motor_PWM_Init(void);
-void Motor_SetSpeed(uint8_t motor, int16_t speed);
-void Motor_StopAll(void);
-void Car_Forward(int16_t speed);
-void Car_Backward(int16_t speed);
-void Car_Left(int16_t speed);
-void Car_Right(int16_t speed);
-void LED_Init(void);
-int speed;
-#define MOTOR_RIGHT_FRONT  0
-#define MOTOR_RIGHT_REAR   1
-#define MOTOR_LEFT_FRONT   2
-#define MOTOR_LEFT_REAR    3
+//void Process_Command(uint8_t cmd); // 指令解析处理
 
-void LED_Init(void)
-{
-    GPIO_InitTypeDef GPIO_InitStructure;
-    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
 
-    GPIO_InitStructure.GPIO_Pin   = LED_PWR_PIN;
-    GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_OUT;
-    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
-    GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
-    GPIO_InitStructure.GPIO_PuPd  = GPIO_PuPd_DOWN;
-    GPIO_Init(LED_PWR_PORT, &GPIO_InitStructure);
+//// ============== 指令解析处理函数 ==============
+//void Process_Command(uint8_t cmd)
+//{
+//    const int16_t RUN_SPEED = 500;  // 小车默认运行速度
+//    switch(cmd)
+//    {
+//        case 'G': Car_Forward(RUN_SPEED); break;    // 前进
+//        case 'B': Car_Backward(RUN_SPEED); break;   // 后退
+//        case 'L': Car_Left(RUN_SPEED); break;       // 左转
+//        case 'R': Car_Right(RUN_SPEED); break;      // 右转
+//        case 'P': Motor_StopAll(); break;           // 停止
+//        case 'O': GPIO_SetBits(LED_PWR_PORT, LED_PWR_PIN); break; // 开灯
+//        case 'I': GPIO_ResetBits(LED_PWR_PORT, LED_PWR_PIN); break;// 关灯
+//        case 'S': LED_Flash_3Times(); break;        // 快速闪烁3次
+//        
+//        // ========== 避障指令 A 核心补充 ==========
+//        case 'A': 
+//		{
+//			auto_avoid_flag = !auto_avoid_flag;
+//			if(auto_avoid_flag)
+//			{
+//				USART1_Send_String((uint8_t*)"Auto Avoid ON\r\n");
+//			}
+//			else
+//			{
+//				Motor_StopAll();       // 关闭避障，立即停车
+//				avoid_action_flag = 0; // 清空动作状态
+//				USART1_Send_String((uint8_t*)"Auto Avoid OFF\r\n");
+//			}
+//			break;
+//		}
+//        default: break;
+//    }
+//}
 
-    GPIO_ResetBits(LED_PWR_PORT, LED_PWR_PIN);
-}
-void Motor_GPIO_Init(void)
-{
-    GPIO_InitTypeDef GPIO_InitStructure;
-    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA |
-                           RCC_AHB1Periph_GPIOB |
-                           RCC_AHB1Periph_GPIOC |
-                           RCC_AHB1Periph_GPIOD |
-                           RCC_AHB1Periph_GPIOE, ENABLE);
-
-    GPIO_InitStructure.GPIO_Pin   = MOTOR_EN_PIN;
-    GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_OUT;
-    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
-    GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
-    GPIO_InitStructure.GPIO_PuPd  = GPIO_PuPd_UP;
-    GPIO_Init(MOTOR_EN_PORT, &GPIO_InitStructure);
-    GPIO_SetBits(MOTOR_EN_PORT, MOTOR_EN_PIN);
-
-    GPIO_InitStructure.GPIO_Pin = MR1_IN1_PIN | MR1_IN2_PIN;
-    GPIO_Init(MR1_IN1_PORT, &GPIO_InitStructure);
-
-    GPIO_InitStructure.GPIO_Pin = MR2_IN1_PIN | MR2_IN2_PIN;
-    GPIO_Init(MR2_IN1_PORT, &GPIO_InitStructure);
-
-    GPIO_InitStructure.GPIO_Pin = ML1_IN1_PIN | ML1_IN2_PIN;
-    GPIO_Init(ML1_IN1_PORT, &GPIO_InitStructure);
-		
-    GPIO_InitStructure.GPIO_Pin = ML2_IN1_PIN | ML2_IN2_PIN;
-    GPIO_Init(ML2_IN1_PORT, &GPIO_InitStructure);
-}
-
-void Motor_PWM_Init(void)
-{
-    GPIO_InitTypeDef GPIO_InitStructure;
-    TIM_TimeBaseInitTypeDef TIM_TimeBaseStructure;
-    TIM_OCInitTypeDef TIM_OCInitStructure;
-
-    RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3, ENABLE);
-    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA | RCC_AHB1Periph_GPIOB, ENABLE);
-
-    GPIO_InitStructure.GPIO_Pin   = MR1_PWM_PIN | MR2_PWM_PIN;
-    GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_AF;
-    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
-    GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
-    GPIO_InitStructure.GPIO_PuPd  = GPIO_PuPd_UP;
-    GPIO_Init(MR1_PWM_PORT, &GPIO_InitStructure);
-    GPIO_PinAFConfig(GPIOA, GPIO_PinSource6, GPIO_AF_TIM3);
-    GPIO_PinAFConfig(GPIOA, GPIO_PinSource7, GPIO_AF_TIM3);
-
-    GPIO_InitStructure.GPIO_Pin   = ML1_PWM_PIN | ML2_PWM_PIN;
-    GPIO_Init(ML1_PWM_PORT, &GPIO_InitStructure);
-    GPIO_PinAFConfig(GPIOB, GPIO_PinSource0, GPIO_AF_TIM3);
-    GPIO_PinAFConfig(GPIOB, GPIO_PinSource1, GPIO_AF_TIM3);
-
-    TIM_TimeBaseStructure.TIM_Period = 999; 
-    TIM_TimeBaseStructure.TIM_Prescaler = 83;
-    TIM_TimeBaseStructure.TIM_ClockDivision = 0;
-    TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
-    TIM_TimeBaseInit(TIM3, &TIM_TimeBaseStructure);
-
-    TIM_OCInitStructure.TIM_OCMode      = TIM_OCMode_PWM1;
-    TIM_OCInitStructure.TIM_OutputState = TIM_OutputState_Enable;
-    TIM_OCInitStructure.TIM_Pulse       = 0; 
-    TIM_OCInitStructure.TIM_OCPolarity   = TIM_OCPolarity_High;
-
-    TIM_OC1Init(TIM3, &TIM_OCInitStructure);
-    TIM_OC1PreloadConfig(TIM3, TIM_OCPreload_Enable);
-
-    TIM_OC2Init(TIM3, &TIM_OCInitStructure);
-    TIM_OC2PreloadConfig(TIM3, TIM_OCPreload_Enable);
-
-    TIM_OC3Init(TIM3, &TIM_OCInitStructure);
-    TIM_OC3PreloadConfig(TIM3, TIM_OCPreload_Enable);
-
-    TIM_OC4Init(TIM3, &TIM_OCInitStructure);
-    TIM_OC4PreloadConfig(TIM3, TIM_OCPreload_Enable);
-
-    TIM_Cmd(TIM3, ENABLE);
-}
-
-void Motor_SetSpeed(uint8_t motor, int16_t speed)
-{
-    uint16_t pwm_val;
-    if (speed > 1000) speed = 1000;
-    if (speed < -1000) speed = -1000;
-
-    if (speed == 0)
-    {
-        switch(motor)
-        {
-            case MOTOR_RIGHT_FRONT:
-                GPIO_ResetBits(MR1_IN1_PORT, MR1_IN1_PIN);
-                GPIO_ResetBits(MR1_IN2_PORT, MR1_IN2_PIN);
-                TIM_SetCompare1(TIM3, 0);
-                break;
-            case MOTOR_RIGHT_REAR:
-                GPIO_ResetBits(MR2_IN1_PORT, MR2_IN1_PIN);
-                GPIO_ResetBits(MR2_IN2_PORT, MR2_IN2_PIN);
-                TIM_SetCompare2(TIM3, 0);
-                break;
-            case MOTOR_LEFT_FRONT:
-                GPIO_ResetBits(ML1_IN1_PORT, ML1_IN1_PIN);
-                GPIO_ResetBits(ML1_IN2_PORT, ML1_IN2_PIN);
-                TIM_SetCompare3(TIM3, 0);
-                break;
-            case MOTOR_LEFT_REAR:
-                GPIO_ResetBits(ML2_IN1_PORT, ML2_IN1_PIN);
-                GPIO_ResetBits(ML2_IN2_PORT, ML2_IN2_PIN);
-                TIM_SetCompare4(TIM3, 0);
-                break;
-        }
-        return;
-    }
-
-    if (speed > 0)
-    {
-        pwm_val = speed;
-        switch(motor)
-        {
-            case MOTOR_RIGHT_FRONT:
-                GPIO_SetBits(MR1_IN1_PORT, MR1_IN1_PIN);
-                GPIO_ResetBits(MR1_IN2_PORT, MR1_IN2_PIN);
-                break;
-            case MOTOR_RIGHT_REAR:
-                GPIO_SetBits(MR2_IN1_PORT, MR2_IN1_PIN);
-                GPIO_ResetBits(MR2_IN2_PORT, MR2_IN2_PIN);
-                break;
-            case MOTOR_LEFT_FRONT:
-                GPIO_SetBits(ML1_IN1_PORT, ML1_IN1_PIN);
-                GPIO_ResetBits(ML1_IN2_PORT, ML1_IN2_PIN);
-                break;
-            case MOTOR_LEFT_REAR:
-                GPIO_SetBits(ML2_IN1_PORT, ML2_IN1_PIN);
-                GPIO_ResetBits(ML2_IN2_PORT, ML2_IN2_PIN);
-                break;
-        }
-    }
-    else
-    {
-        pwm_val = -speed;
-        switch(motor)
-        {
-            case MOTOR_RIGHT_FRONT:
-                GPIO_ResetBits(MR1_IN1_PORT, MR1_IN1_PIN);
-                GPIO_SetBits(MR1_IN2_PORT, MR1_IN2_PIN);
-                break;
-            case MOTOR_RIGHT_REAR:
-                GPIO_ResetBits(MR2_IN1_PORT, MR2_IN1_PIN);
-                GPIO_SetBits(MR2_IN2_PORT, MR2_IN2_PIN);
-                break;
-            case MOTOR_LEFT_FRONT:
-                GPIO_ResetBits(ML1_IN1_PORT, ML1_IN1_PIN);
-                GPIO_SetBits(ML1_IN2_PORT, ML1_IN2_PIN);
-                break;
-            case MOTOR_LEFT_REAR:
-                GPIO_ResetBits(ML2_IN1_PORT, ML2_IN1_PIN);
-                GPIO_SetBits(ML2_IN2_PORT, ML2_IN2_PIN);
-                break;
-        }
-    }
-
-    switch(motor)
-    {
-        case MOTOR_RIGHT_FRONT: TIM_SetCompare1(TIM3, pwm_val); break;
-        case MOTOR_RIGHT_REAR:  TIM_SetCompare2(TIM3, pwm_val); break;
-        case MOTOR_LEFT_FRONT:  TIM_SetCompare3(TIM3, pwm_val); break;
-        case MOTOR_LEFT_REAR:   TIM_SetCompare4(TIM3, pwm_val); break;
-    }
-}
-
-void Motor_StopAll(void)
-{
-    Motor_SetSpeed(MOTOR_RIGHT_FRONT, 0);
-    Motor_SetSpeed(MOTOR_RIGHT_REAR, 0);
-    Motor_SetSpeed(MOTOR_LEFT_FRONT, 0);
-    Motor_SetSpeed(MOTOR_LEFT_REAR, 0);
-}
-
-void Car_Forward(int16_t speed)
-{
-    Motor_SetSpeed(MOTOR_RIGHT_FRONT, -speed);
-    Motor_SetSpeed(MOTOR_RIGHT_REAR, -speed);
-    Motor_SetSpeed(MOTOR_LEFT_FRONT, speed);
-    Motor_SetSpeed(MOTOR_LEFT_REAR, speed);
-}
-
-void Car_Backward(int16_t speed)
-{
-    Motor_SetSpeed(MOTOR_RIGHT_FRONT, speed);
-    Motor_SetSpeed(MOTOR_RIGHT_REAR, speed);
-    Motor_SetSpeed(MOTOR_LEFT_FRONT, -speed);
-    Motor_SetSpeed(MOTOR_LEFT_REAR, -speed);
-}
-
-void Car_Right(int16_t speed)
-{
-    Motor_SetSpeed(MOTOR_RIGHT_FRONT, speed);
-    Motor_SetSpeed(MOTOR_RIGHT_REAR, speed);
-    Motor_SetSpeed(MOTOR_LEFT_FRONT, speed);
-    Motor_SetSpeed(MOTOR_LEFT_REAR, speed);
-}
-
-void Car_Left(int16_t speed)
-{
-    Motor_SetSpeed(MOTOR_RIGHT_FRONT, -speed);
-    Motor_SetSpeed(MOTOR_RIGHT_REAR, -speed);
-    Motor_SetSpeed(MOTOR_LEFT_FRONT, -speed);
-    Motor_SetSpeed(MOTOR_LEFT_REAR, -speed);
-}
-
-void USART3_IRQHandler()
-{
-    // 1.判断USART接收中断是否触发
-    if(USART_GetITStatus(USART3, USART_IT_RXNE) == SET)
-    {
-        // 2.读取蓝牙下发单字节指令
-        uint8_t data = USART_ReceiveData(USART3);
-        
-        // 3.回显数据到调试串口USART1（电脑串口助手查看收发）
-        USART_SendData(USART1, data);
-        while (USART_GetFlagStatus(USART1, USART_FLAG_TXE) != SET);
-
-        // 4.匹配安卓APP十六进制指令，执行小车动作
-        switch (data)
-        {
-            case 0x01: // 摇杆上：前进，speed映射0~100 → PWM 0~1000
-                Car_Forward((int16_t)speed * 10);
-                break;
-            case 0x02: // 摇杆回中：全部电机停止
-                Motor_StopAll();
-                break;
-            case 0x03: // 摇杆下：后退
-                Car_Backward((int16_t)speed * 10);
-                break;
-            case 0x04: // 摇杆右：原地右转
-                Car_Right((int16_t)speed * 10);
-                break;
-            case 0x05: // 摇杆左：原地左转
-                Car_Left((int16_t)speed * 10);
-                break;
-            case 0x06: // APP加速按键：速度+10
-                speed += 10;
-                if(speed > 100) speed = 100;
-                break;
-            case 0x07: // APP减速按键：速度-10
-                if(speed < 10)
-                    speed = 0;
-                else
-                    speed -= 10;
-                break;
-            case 0x08: // 超声波传感器触发（预留，可添加数据上传逻辑）
-                break;
-            case 0x09: // 红外循迹触发（预留）
-                break;
-            case 0x10: // 左转向灯（你未实现，预留函数位）
-                // Car_TurnLeftLight();
-                break;
-            case 0x11: // 右转向灯（预留）
-                // Car_TurnRightLight();
-                break;
-            case 0x12: // 喇叭开（预留）
-                // Car_Buzzer_On();
-                break;
-            case 0x13: // 喇叭关（预留）
-                // Car_Buzzer_Off();
-                break;
-            case 0x14: // 读取电池电压（预留上传）
-                break;
-            default: // 未知指令，不执行任何动作
-                break;
-        }
-
-        // 5.清除接收中断标志位
-        USART_ClearITPendingBit(USART3, USART_IT_RXNE);
-    }
-}
-
+// ============== 主函数 ==============
 int main(void)
 {
-	SysTick_Init();
-	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
+    // 1. 先初始化SysTick（必须最先执行，否则延时失效）
+    SysTick_Init();
+    
+    // 2. 硬件初始化（顺序调整，避免冲突）
+    LED_Init();                // 先初始化LED，确保闪烁可见
+    HCSR04_Init();
+	
+    USART1_Init(USART_BAUDRATE);
+	
+    USART3_Init(USART3_BAUDRATE);
+	
+	
+	USART3_Send_String("ATE1\r\n");
+	delay_ms(2000);
+	USART3_Send_String("AT+BLEMODE=0\r\n");
+	delay_ms(2000);
+	
+	USART3_Send_String("AT+GMR\r\n");
+	delay_ms(1000);
+//	USART3_Send_String("AT+BLEMODE=9\r\n");
+//	delay_ms(1000);
 //	
-//    Motor_GPIO_Init();
-//    Motor_PWM_Init();
-//		LED_Init();
-	
-	BLE_Init();
-	
-	USART3_SendStirng("ATE1\r\n");  						//打开蓝牙的回显，（给蓝牙发AT指令，然后蓝牙会回复stm32消息）
-	
-		delay_ms(500);
-	GPIO_SetBits(LED_PWR_PORT, LED_PWR_PIN);
-			USART3_SendStirng("AT+BLEMODE=9\r\n");    	//设置蓝牙位从模式
-		delay_ms(500);
-		USART3_SendStirng("AT+BLENAME=DWQ\r\n");
-delay_ms(500);
-		USART3_SendStirng("AT+BLEMODE=0\r\n");    	//设置蓝牙位从模式
-		delay_ms(500);
+//	USART3_Send_String("AT+BLENAME=F4DWQ\r\n");
+//	
+//	delay_ms(1000);
+	Su03t_Init();
+	//USART3_Init(USART3_BAUDRATE);
+	Motor_GPIO_Init();
+    Motor_PWM_Init();
+//    usart_rx_cnt = 0;
+//    memset(usart_rx_buf, 0, USART_RX_BUF_LEN);
+
+    // 3. LED闪烁3次（此时延时函数已生效）
+	//跳过蓝牙回复
+	USART_ITConfig(USART3, USART_IT_RXNE, ENABLE);
+	//USART_Cmd(USART3, ENABLE);
+    LED_Flash_3Times();  // 开机提示
+//	static uint32_t time_TH = 0;
 	
     while(1)
     {
-//			GPIO_SetBits(LED_PWR_PORT, LED_PWR_PIN);
-//			delay_ms(3000);
-//			GPIO_ResetBits(LED_PWR_PORT, LED_PWR_PIN);
-//			delay_ms(3000);
+		
+//		time_TH++;
+//		if(time_TH >= 100)  // 100ms 检测一次
+//		{
+//			//读取模块数据
+//				DHT11_Read_Data();
+//				//显示读取后的温度数据
+//				USART1_Send_T(Get_temperature() );
+//				USART1_Send_H(Get_humidity());
+//				time_TH = 0;
+//		}
+//		delay_ms(10);
+		
+//        printf("temperature = %.2f\r\n", Get_temperature() );
+//        //显示读取后的湿度数据
+//        printf("humidity = %.2f\r\n", Get_humidity() );
+		
+        // 串口指令处理（增加防呆，只处理有效指令）
+//        if(usart_rx_cnt > 0)
+//        {
+//            Process_Command(usart_rx_buf[0]);	
+//            // 清除缓冲区（优化：只清已处理的字节，避免漏指令）
+//            for(uint8_t i=0; i<usart_rx_cnt; i++)
+//                usart_rx_buf[i] = 0;
+//            usart_rx_cnt = 0;
+//        }
+        // 自动避障：开启状态下每100ms检测一次
+		static uint32_t time_cnt = 0;
+		if(auto_avoid_flag == 1)	//自动避障标志位
+		{
+			time_cnt++;
+			if(time_cnt >= 100)  // 100ms 检测一次
+			{
+				float distance = HCSR04_GetDistance();
+				HCSR04_Avoidance(distance);
+				time_cnt = 0;
+			}
+			delay_ms(10);
+		}
     }
 }
+
+
+
